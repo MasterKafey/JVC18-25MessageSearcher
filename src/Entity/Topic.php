@@ -19,6 +19,9 @@ class Topic
     #[ORM\Column]
     private ?int $messageNumber = null;
 
+    #[ORM\Column]
+    private ?int $messageRead = 0;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -41,10 +44,21 @@ class Topic
         return $this->messageNumber;
     }
 
-    public function setMessageNumber(int $messageNumber): self
+    public function setMessageNumber(?int $messageNumber): self
     {
         $this->messageNumber = $messageNumber;
 
+        return $this;
+    }
+
+    public function getMessageRead(): ?int
+    {
+        return $this->messageRead;
+    }
+
+    public function setMessageRead(?int $messageRead): self
+    {
+        $this->messageRead = $messageRead;
         return $this;
     }
 }

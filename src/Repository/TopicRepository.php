@@ -51,4 +51,16 @@ class TopicRepository extends ServiceEntityRepository
 
         return $queryBuilder->getQuery()->getResult();
     }
+
+    public function findUnreadTopic(): ?Topic
+    {
+        $queryBuilder = $this->createQueryBuilder('topic');
+        $queryBuilder->where(
+            $queryBuilder->expr()->gt('topic.messageNumber', 'topic.messageRead')
+        );
+
+        $queryBuilder->setMaxResults(1);
+
+        return $queryBuilder->getQuery()->getSingleResult();
+    }
 }

@@ -4,7 +4,6 @@ namespace App\Command;
 
 use App\Entity\Message;
 use App\Entity\Topic;
-use ContainerFGFmAsx\getDoctrine_UlidGeneratorService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\BrowserKit\HttpBrowser;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -45,66 +44,59 @@ class SearchForMessageCommand extends Command
     {
 
         while(true) {
-            $topic = $this->entityManager->getRepository(Topic::class)->findOneBy(['messageNumber' => 0]);
+            $topic = $this->entityManager->getRepository(Topic::class)->findUnreadTopic();
             if (null === $topic) {
                 break;
             }
             dump('id: ' . $topic->getId() . " uri : " . $topic->getUri());
-            $messages = $this->searchMessageFromCreator($topic, $this->pseudo, $totalMessage);
+            $this->searchMessageFromCreator($topic, $this->pseudo, $totalMessage);
 
-            if($totalMessage === 0) {
-                $this->entityManager->remove($topic);
-                $this->entityManager->flush();
-                continue;
-            }
-
-            if ($topic->getMessageNumber() === $totalMessage) {
-                continue;
-            }
-            $topic->setMessageNumber($totalMessage);
+            $topic
+                ->setMessageRead($totalMessage)
+                ->setMessageNumber($totalMessage)
+            ;
             $this->entityManager->persist($topic);
-            foreach ($messages as $message) {
-                $this->entityManager->persist($message);
-            }
             $this->entityManager->flush();
         }
         return Command::SUCCESS;
     }
 
-    public function searchMessageFromCreator(Topic $topic, string $creator, &$totalMessage): array
+    public function searchMessageFromCreator(Topic $topic, string $creator, &$totalMessage): void
     {
         $creator = strtolower($creator);
-        $messages = [];
         $browser = new HttpBrowser($this->client);
         $link = 'https://www.jeuxvideo.com' . $topic->getUri();
-        $i = 1;
-        $totalMessage = 0;
+        $totalMessage = $topic->getMessageRead();
+        $i = intval($totalMessage / 20);
         do {
-            $crawler = $browser->request(Request::METHOD_GET, $url = $this->nextPage($link, $i++));
-            if ($crawler->getBaseHref() !== $url) {
-                break;
-            }
-            $crawler = $crawler->filter('.conteneur-message');
-            foreach ($crawler as $childNode) {
-                ++$totalMessage;
-                $author = trim($childNode->childNodes->item(1)->childNodes->item(3)->textContent);
-                if ($childNode->childNodes->item(1)->childNodes->item(9) === null) {
-                    continue;
+            try {
+                $crawler = $browser->request(Request::METHOD_GET, $url = $this->nextPage($link, ++$i));
+                if ($crawler->getBaseHref() !== $url) {
+                    break;
                 }
-                $datetime = $this->convertDateTime(trim($childNode->childNodes->item(1)->childNodes->item(9)->textContent));
-                $content = trim($childNode->childNodes->item(3)->textContent);
-                if ($creator === strtolower($author)) {
-                    $messages[] = (new Message())
-                        ->setAuthor($author)
-                        ->setTopic($topic)
-                        ->setContent($content)
-                        ->setCreationDateTime($datetime);
-                }
-            }
-            dump("Page $i");
-        } while (true);
+                $crawler = $crawler->filter('.conteneur-message');
+                foreach ($crawler as $childNode) {
+                    $author = trim($childNode->childNodes->item(1)->childNodes->item(3)->textContent);
+                    if ($childNode->childNodes->item(1)->childNodes->item(11) === null) {
+                        continue;
+                    }
+                    ++$totalMessage;
+                    $topic->setMessageRead($totalMessage);
+                    $datetime = $this->convertDateTime(trim($childNode->childNodes->item(1)->childNodes->item(11)->textContent));
+                    $content = trim($childNode->childNodes->item(3)->textContent);
 
-        return $messages;
+                    if (strtolower($creator) === strtolower($author)) {
+                        $this->entityManager->persist((new Message())
+                            ->setAuthor($author)
+                            ->setTopic($topic)
+                            ->setContent($content)
+                            ->setCreationDateTime($datetime));
+                    }
+                }
+                $this->entityManager->persist($topic);
+                $this->entityManager->flush();
+            } catch (\Exception) {}
+        } while (true);
     }
 
     public function convertDateTime(string $dateTime): bool|\DateTime
