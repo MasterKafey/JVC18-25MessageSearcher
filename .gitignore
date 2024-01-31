@@ -9,4 +9,5 @@
 /vendor/
 /.idea/
 /volumes/
+/last_forum.yaml
 ###< symfony/framework-bundle ###
