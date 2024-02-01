@@ -3,9 +3,8 @@ version: '3.7'
 services:
 
     app.jvc:
-        build:
-            dockerfile: .docker/build/Dockerfile
-            context: .
+        container_name: app.jvc
+        image: masterkafei/jvc-searcher
         environment:
             DATABASE_HOST: database.jvc
             DATABASE_NAME: ${DATABASE_NAME:-jvc}
@@ -13,16 +12,18 @@ services:
             DATABASE_PASSWORD: ${DATABASE_PASSWORD}
             DATABASE_PORT: 3306
             APP_PSEUDO_TO_SEARCH: ${APP_PSEUDO_TO_SEARCH:-}
+        volumes:
+            - ./last_forum.yaml:/app/last_forum.yaml
         networks:
             - database
 
     database.jvc:
+        container_name: database.jvc
         image: mariadb:latest
         ports:
             - "3306:3306"
         volumes:
             - ./volumes/database/data:/var/lib/mysql
-            - ./last_forum.yaml:/app/last_forum.yaml
         environment:
             MARIADB_RANDOM_ROOT_PASSWORD: true
             MARIADB_DATABASE: ${DATABASE_NAME:-jvc}
